@@ -1,0 +1,20 @@
+{
+  "id": "web-basic",
+  "name": "Web Basic Stack",
+  "packages": [
+    {
+      "id": "node",
+      "display_name": "Node.js LTS",
+      "windows_cmd": "winget install --silent OpenJS.NodeJS.LTS",
+      "linux_cmd": "sudo dnf install -y nodejs npm",
+      "verify_cmd": "node -v"
+    },
+    {
+      "id": "git",
+      "display_name": "Git",
+      "windows_cmd": "winget install --silent Git.Git",
+      "linux_cmd": "sudo dnf install -y git",
+      "verify_cmd": "git --version"
+    }
+  ]
+}

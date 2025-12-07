@@ -2,16 +2,16 @@
 #define STACK_H
 
 typedef struct {
-    const char *id;
-    const char *display_name;
-    const char *windows_cmd;
-    const char *linux_cmd;
-    const char *verify_cmd;
+    char *id;
+    char *display_name;
+    char *windows_cmd;
+    char *linux_cmd;
+    char *verify_cmd;
 } Package;
 
 typedef struct {
-    const char *id;
-    const char *name;
+    char *id;
+    char *name;
     int package_count;
     Package *packages;
 } Stack;
