@@ -1,0 +1,27 @@
+{
+  "id": "python-dev",
+  "name": "Python Development",
+  "packages": [
+    {
+      "id": "python",
+      "display_name": "Python 3 Interpreter",
+      "windows_cmd": "winget install --silent Python.Python.3",
+      "linux_cmd": "sudo dnf install -y python3",
+      "verify_cmd": "python3 --version"
+    },
+    {
+      "id": "pip",
+      "display_name": "Pip (Python package manager)",
+      "windows_cmd": "python -m ensurepip --upgrade",
+      "linux_cmd": "python3 -m ensurepip --upgrade",
+      "verify_cmd": "python3 -m pip --version"
+    },
+    {
+      "id": "venv",
+      "display_name": "Virtual Environment Tools",
+      "windows_cmd": "python -m pip install --upgrade virtualenv",
+      "linux_cmd": "python3 -m pip install --upgrade virtualenv",
+      "verify_cmd": "python3 -m virtualenv --version"
+    }
+  ]
+}

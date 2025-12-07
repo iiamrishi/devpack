@@ -1,10 +1,21 @@
 #ifndef STACK_LIST_H
 #define STACK_LIST_H
 
-/**
- * List available stacks from the stacks/ directory.
- * Returns 0 on success, non-zero on error.
- */
+#include <stdbool.h>
+#include <stddef.h>
+
+typedef struct {
+    const char *name;
+    bool (*detect_fn)(char *details, size_t details_size);
+} DevStack;
+
+/* list all detected stacks, return 0 on success */
 int list_stacks(void);
 
+bool detect_c_toolchain(char *details, size_t details_size);
+bool detect_python(char *details, size_t details_size);
+bool detect_git(char *details, size_t details_size);
+bool detect_nodejs(char *details, size_t details_size);
+bool detect_docker(char *details, size_t details_size);
+bool detect_rust(char *details, size_t details_size);
 #endif

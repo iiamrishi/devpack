@@ -1,0 +1,34 @@
+{
+  "id": "cpp-dev",
+  "name": "C / C++ Development",
+  "packages": [
+    {
+      "id": "compiler",
+      "display_name": "GCC / G++",
+      "windows_cmd": "winget install --silent GCC.GCC",
+      "linux_cmd": "sudo dnf install -y gcc gcc-c++",
+      "verify_cmd": "gcc --version"
+    },
+    {
+      "id": "debugger",
+      "display_name": "GDB Debugger",
+      "windows_cmd": "winget install --silent GNU.GDB",
+      "linux_cmd": "sudo dnf install -y gdb",
+      "verify_cmd": "gdb --version"
+    },
+    {
+      "id": "cmake",
+      "display_name": "CMake Build System",
+      "windows_cmd": "winget install --silent Kitware.CMake",
+      "linux_cmd": "sudo dnf install -y cmake",
+      "verify_cmd": "cmake --version"
+    },
+    {
+      "id": "make",
+      "display_name": "Make",
+      "windows_cmd": "winget install --silent GnuWin32.Make",
+      "linux_cmd": "sudo dnf install -y make",
+      "verify_cmd": "make --version"
+    }
+  ]
+}
