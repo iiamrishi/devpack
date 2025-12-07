@@ -16,6 +16,10 @@ typedef struct {
     Package *packages;
 } Stack;
 
-int install_stack(const Stack *stack);
+/**
+ * Install all packages in a stack.
+ * If dry_run != 0, commands are only printed, not executed.
+ */
+int install_stack(const Stack *stack, int dry_run);
 
 #endif
