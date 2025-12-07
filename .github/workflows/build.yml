@@ -1,0 +1,64 @@
+name: Build and test devpack
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make
+
+      - name: Build devpack
+        run: |
+          gcc -Wall -Wextra -Wpedantic \
+            -Isrc \
+            -Ithird_party/cJSON \
+            src/*.c third_party/cJSON/cJSON.c \
+            -o devpack
+
+      - name: Smoke test: list stacks
+        run: ./devpack list
+
+      - name: Smoke test: dry-run install web-basic
+        run: ./devpack install web-basic --dry-run
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            make
+
+      - name: Build devpack (Windows)
+        shell: msys2 {0}
+        run: |
+          gcc -Wall -Wextra -Wpedantic \
+            -Isrc \
+            -Ithird_party/cJSON \
+            src/*.c third_party/cJSON/cJSON.c \
+            -o devpack.exe
+
+      - name: Smoke test: list stacks (Windows)
+        shell: msys2 {0}
+        run: ./devpack.exe list
+
+      - name: Smoke test: dry-run install web-basic (Windows)
+        shell: msys2 {0}
+        run: ./devpack.exe install web-basic --dry-run
