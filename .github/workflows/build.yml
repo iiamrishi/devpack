@@ -25,10 +25,10 @@ jobs:
             src/*.c third_party/cJSON/cJSON.c \
             -o devpack
 
-      - name: Smoke test: list stacks
+      - name: Smoke test list stacks
         run: ./devpack list
 
-      - name: Smoke test: dry-run install web-basic
+      - name: Smoke test dry run install web-basic
         run: ./devpack install web-basic --dry-run
 
   build-windows:
@@ -38,13 +38,11 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Set up MSYS2
+      - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
         with:
           update: true
-          install: >-
-            mingw-w64-x86_64-gcc
-            make
+          install: mingw-w64-x86_64-gcc make
 
       - name: Build devpack (Windows)
         shell: msys2 {0}
@@ -55,10 +53,10 @@ jobs:
             src/*.c third_party/cJSON/cJSON.c \
             -o devpack.exe
 
-      - name: Smoke test: list stacks (Windows)
+      - name: Smoke test list stacks (Windows)
         shell: msys2 {0}
         run: ./devpack.exe list
 
-      - name: Smoke test: dry-run install web-basic (Windows)
+      - name: Smoke test dry run install web-basic (Windows)
         shell: msys2 {0}
         run: ./devpack.exe install web-basic --dry-run
