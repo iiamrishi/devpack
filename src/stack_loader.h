@@ -3,15 +3,9 @@
 
 #include "stack.h"
 
-/**
- * Load a stack definition from stacks/<stack_id>.json
- * Returns 0 on success, non-zero on failure.
+/* Load stacks/<stack_id>.json into `out`.
+ * Returns 0 on success, non-zero on error.
  */
 int load_stack_from_file(const char *stack_id, Stack *out);
-
-/**
- * Free all memory owned by a Stack loaded with load_stack_from_file.
- */
-void free_stack(Stack *stack);
 
 #endif

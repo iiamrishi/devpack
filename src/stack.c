@@ -1,73 +1,84 @@
-#include <stdio.h>
 #include "stack.h"
-#include "platform.h"
-#include "exec.h"
-#include "log.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int install_stack(const Stack *stack, int dry_run) {
-    if (!stack) return -1;
-
-    OSType os = detect_os();
-    if (os == OS_UNKNOWN) {
-        log_error("Unsupported OS");
+    if (!stack) {
         return -1;
     }
 
-    printf("Installing stack: %s (%s)\n", stack->name, stack->id);
-    if (dry_run) {
-        log_info("Dry-run mode: commands will NOT be executed.");
-    } else {
-        log_info("Starting stack install...");
+    if (stack->package_count <= 0 || !stack->packages) {
+        fprintf(stderr, "Stack '%s' has no packages to install\n",
+                stack->id ? stack->id : "(unknown)");
+        return -1;
     }
 
-    for (int i = 0; i < stack->package_count; ++i) {
-        Package *p = &stack->packages[i];
+    printf("Installing stack: %s\n", stack->name ? stack->name : "(unnamed)");
+    int overall_rc = 0;
 
-        printf("\n==> %s %s (%s)\n",
-               dry_run ? "[DRY-RUN] Would install" : "Installing",
-               p->display_name,
-               p->id);
+    for (int i = 0; i < stack->package_count; i++) {
+        const Package *p = &stack->packages[i];
 
         const char *cmd = NULL;
-        if (os == OS_WINDOWS) {
-            cmd = p->windows_cmd;
-        } else if (os == OS_LINUX) {
-            cmd = p->linux_cmd;
-        }
 
-        if (!cmd) {
-            log_error("No install command for this OS");
+#if defined(_WIN32)
+        cmd = p->windows_cmd;
+#else
+        cmd = p->linux_cmd;
+#endif
+
+        if (!cmd || cmd[0] == '\0') {
+            printf("  [skip] %s (no command for this platform)\n",
+                   p->display_name ? p->display_name : "(unnamed package)");
             continue;
         }
 
-        printf("Install command: %s\n", cmd);
+        printf("  Package: %s\n", p->display_name ? p->display_name : "(unnamed package)");
 
-        if (!dry_run) {
-            if (run_command(cmd) != 0) {
-                log_error("Install failed");
-                continue;
-            }
-
-            if (p->verify_cmd) {
-                printf("Verifying %s...\n", p->id);
-                if (run_command(p->verify_cmd) == 0) {
-                    printf("✔ %s OK\n", p->id);
-                } else {
-                    printf("✖ %s verification FAILED\n", p->id);
-                }
-            }
+        if (dry_run) {
+            printf("    [dry-run] %s\n", cmd);
         } else {
-            if (p->verify_cmd) {
-                printf("Verify command (would run): %s\n", p->verify_cmd);
+            printf("    [run] %s\n", cmd);
+            int rc = system(cmd);
+            if (rc != 0) {
+                fprintf(stderr, "    Command failed with code %d\n", rc);
+                if (overall_rc == 0) {
+                    overall_rc = rc;
+                }
+            } else if (p->verify_cmd && p->verify_cmd[0] != '\0') {
+                printf("    [verify] %s\n", p->verify_cmd);
+                int vrc = system(p->verify_cmd);
+                if (vrc != 0 && overall_rc == 0) {
+                    overall_rc = vrc;
+                }
             }
         }
     }
 
-    if (!dry_run) {
-        log_info("Stack install finished.");
-    } else {
-        log_info("Dry-run finished. No changes were made.");
+    return overall_rc;
+}
+
+void free_stack(Stack *stack) {
+    if (!stack) {
+        return;
     }
 
-    return 0;
+    free(stack->id);
+    free(stack->name);
+
+    if (stack->packages) {
+        for (int i = 0; i < stack->package_count; i++) {
+            Package *p = &stack->packages[i];
+            free(p->id);
+            free(p->display_name);
+            free(p->windows_cmd);
+            free(p->linux_cmd);
+            free(p->verify_cmd);
+        }
+        free(stack->packages);
+    }
+
+    memset(stack, 0, sizeof(*stack));
 }

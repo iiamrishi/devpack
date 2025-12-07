@@ -1,0 +1,13 @@
+{
+  "id": "nodejs",
+  "name": "Node.js",
+  "packages": [
+    {
+      "id": "nodejs-arch",
+      "display_name": "Node.js + npm (Arch Linux)",
+      "windows_cmd": "",
+      "linux_cmd": "sudo pacman -S --needed nodejs npm",
+      "verify_cmd": "node --version"
+    }
+  ]
+}

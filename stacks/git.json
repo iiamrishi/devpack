@@ -1,0 +1,13 @@
+{
+  "id": "git",
+  "name": "Git",
+  "packages": [
+    {
+      "id": "git-core",
+      "display_name": "Git (Arch Linux)",
+      "windows_cmd": "",
+      "linux_cmd": "sudo pacman -S --needed git",
+      "verify_cmd": "git --version"
+    }
+  ]
+}
