@@ -114,21 +114,25 @@ int verify_stack(const Stack *stack)
         printf("    $ %s\n", p->verify_cmd);
         int status = system(p->verify_cmd);
         if (status == -1) {
-            printf("    -> failed to start command\n\n");
+            printf("    " COLOR_RED "-> failed to start command" COLOR_RESET "\n\n");
             failures++;
         } else if (status != 0) {
-            printf("    -> command exited with status %d (NOT OK)\n\n", status);
+            printf("    " COLOR_RED "-> command exited with status %d (NOT OK)" COLOR_RESET "\n\n",
+                   status);
             failures++;
         } else {
-            printf("    -> OK\n\n");
+            printf("    " COLOR_GREEN "-> OK" COLOR_RESET "\n\n");
         }
+
     }
 
     if (failures > 0) {
-        printf("Verification finished with %d failed check(s).\n", failures);
+        printf(COLOR_RED "Verification finished with %d failed check(s).\n" COLOR_RESET,
+               failures);
         return 1;
     }
 
-    printf("All checks passed.\n");
+    printf(COLOR_GREEN "All checks passed.\n" COLOR_RESET);
     return 0;
+
 }

@@ -12,5 +12,6 @@ int load_stack_from_file(const char *stack_id, Stack *out);
  * Returns 0 on success, non-zero on error.
  */
 int list_available_stacks(void);
-
+/* List stacks as JSON. */
+int list_available_stacks_json(void);
 #endif /* STACK_LOADER_H */

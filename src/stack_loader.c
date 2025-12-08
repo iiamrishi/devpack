@@ -121,11 +121,11 @@ int load_stack_from_file(const char *stack_id, Stack *out)
 
         Package *p = &out->packages[idx++];
 
-        cJSON *pid  = cJSON_GetObjectItem(pkg_json, "id");
-        cJSON *disp = cJSON_GetObjectItem(pkg_json, "display_name");
-        cJSON *win  = cJSON_GetObjectItem(pkg_json, "windows_cmd");
-        cJSON *lin  = cJSON_GetObjectItem(pkg_json, "linux_cmd");
-        cJSON *ver  = cJSON_GetObjectItem(pkg_json, "verify_cmd");
+        cJSON *pid  = cJSON_GetObjectItemCaseSensitive(pkg_json, "id");
+        cJSON *disp = cJSON_GetObjectItemCaseSensitive(pkg_json, "display_name");
+        cJSON *win  = cJSON_GetObjectItemCaseSensitive(pkg_json, "windows_cmd");
+        cJSON *lin  = cJSON_GetObjectItemCaseSensitive(pkg_json, "linux_cmd");
+        cJSON *ver  = cJSON_GetObjectItemCaseSensitive(pkg_json, "verify_cmd");
 
         if (cJSON_IsString(pid))  p->id           = xstrdup(pid->valuestring);
         if (cJSON_IsString(disp)) p->display_name = xstrdup(disp->valuestring);
@@ -139,7 +139,7 @@ int load_stack_from_file(const char *stack_id, Stack *out)
 }
 
 /* ---------------------------------------------------------
- * List available stacks from ./stacks directory
+ * List available stacks (human-readable)
  * --------------------------------------------------------- */
 int list_available_stacks(void)
 {
@@ -188,5 +188,84 @@ int list_available_stacks(void)
         printf(" (no stacks found)\n");
     }
 
+    return 0;
+}
+
+/* ---------------------------------------------------------
+ * List available stacks as JSON
+ * --------------------------------------------------------- */
+int list_available_stacks_json(void)
+{
+    DIR *dir = opendir("stacks");
+    if (!dir) {
+        perror("opendir(stacks)");
+        return 1;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        closedir(dir);
+        return 1;
+    }
+
+    cJSON *arr = cJSON_CreateArray();
+    if (!arr) {
+        cJSON_Delete(root);
+        closedir(dir);
+        return 1;
+    }
+    cJSON_AddItemToObject(root, "stacks", arr);
+
+    struct dirent *ent;
+    int found = 0;
+
+    while ((ent = readdir(dir)) != NULL) {
+        const char *name = ent->d_name;
+
+        if (name[0] == '.') continue;
+
+        size_t len = strlen(name);
+        if (len <= 5 || strcmp(name + len - 5, ".json") != 0)
+            continue;
+
+        char stack_id[256];
+        size_t id_len = len - 5;
+        if (id_len >= sizeof(stack_id)) id_len = sizeof(stack_id) - 1;
+        memcpy(stack_id, name, id_len);
+        stack_id[id_len] = '\0';
+
+        Stack s;
+        if (load_stack_from_file(stack_id, &s) == 0) {
+            cJSON *item = cJSON_CreateObject();
+            if (item) {
+                cJSON_AddStringToObject(
+                    item, "id", s.id ? s.id : stack_id);
+                if (s.name) {
+                    cJSON_AddStringToObject(item, "name", s.name);
+                }
+                cJSON_AddStringToObject(item, "file", name);
+                cJSON_AddNumberToObject(item, "package_count",
+                                        s.package_count);
+                cJSON_AddItemToArray(arr, item);
+            }
+            free_stack(&s);
+            found++;
+        } else {
+            /* skip invalid stacks in JSON mode */
+        }
+    }
+
+    closedir(dir);
+
+    /* Even if found==0, we still print: { "stacks": [] } */
+    char *json = cJSON_Print(root);
+    if (!json) {
+        cJSON_Delete(root);
+        return 1;
+    }
+
+    printf("%s\n", json);
+    free(json);
+    cJSON_Delete(root);
     return 0;
 }

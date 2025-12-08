@@ -29,7 +29,12 @@ int main(int argc, char **argv) {
 
     /* -------- stacks: list JSON-defined stacks -------- */
     if (strcmp(cmd, "stacks") == 0) {
-        return list_available_stacks();
+        int json = (argc >= 3 && strcmp(argv[2], "--json") == 0);
+        if (json) {
+            return list_available_stacks_json();
+        } else {
+            return list_available_stacks();
+        }
     }
 
     /* -------- install -------- */

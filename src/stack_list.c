@@ -1,10 +1,9 @@
 #include "stack_list.h"
+#include "stack.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#define _POSIX_C_SOURCE 200809L
-
 
 /* ---------------------------------------------------------
  * Helper: run a shell command and capture first line output
@@ -31,7 +30,7 @@ static bool run_command_capture(const char *cmd,
         buffer[len - 1] = '\0';
     }
 
-    /* ✅ only succeed if command exited normally */
+    /* only succeed if command exited normally */
     if (status != 0) {
         return false;
     }
@@ -125,7 +124,6 @@ bool detect_git(char *details, size_t details_size)
     return false;
 }
 
-
 /* ---------------------------------------------------------
  * Node.js detection
  * --------------------------------------------------------- */
@@ -200,7 +198,6 @@ bool detect_rust(char *details, size_t details_size)
     return true;
 }
 
-
 /* ---------------------------------------------------------
  * Stack registry
  * --------------------------------------------------------- */
@@ -222,8 +219,8 @@ int list_stacks(void)
 
     size_t count = sizeof(STACKS) / sizeof(STACKS[0]);
 
-    bool has_git = false;
-    bool has_node = false;
+    bool has_git    = false;
+    bool has_node   = false;
     bool has_docker = false;
 
     for (size_t i = 0; i < count; i++) {
@@ -240,7 +237,10 @@ int list_stacks(void)
             has_docker = true;
         }
 
-        printf("[%s] %s\n", ok ? "OK" : "MISSING", s->name);
+        const char *tag_color = ok ? COLOR_GREEN : COLOR_RED;
+        const char *tag_text  = ok ? "OK" : "MISSING";
+
+        printf("[%s%s%s] %s\n", tag_color, tag_text, COLOR_RESET, s->name);
         if (details[0] != '\0') {
             printf("    -> %s\n", details);
         }
@@ -248,8 +248,11 @@ int list_stacks(void)
 
     printf("\n");
 
-    bool web_ok = has_git && has_node;
-    printf("[%s] Web Dev\n", web_ok ? "OK" : "MISSING");
+    bool web_ok      = has_git && has_node;
+    const char *web_color = web_ok ? COLOR_GREEN : COLOR_RED;
+    const char *web_tag   = web_ok ? "OK" : "MISSING";
+
+    printf("[%s%s%s] Web Dev\n", web_color, web_tag, COLOR_RESET);
     printf("    -> needs Git + Node.js%s\n",
            has_docker ? " (Docker available)" : " (Docker optional)");
 
