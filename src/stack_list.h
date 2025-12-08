@@ -22,4 +22,7 @@ bool detect_nodejs(char *details, size_t details_size);
 bool detect_docker(char *details, size_t details_size);
 bool detect_rust(char *details, size_t details_size);
 
+
+int doctor(void);
+
 #endif

@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/utsname.h>
 
 #include "cJSON.h"
 
@@ -338,5 +340,84 @@ int list_stacks_json(void)
     printf("%s\n", json);
     free(json);
     cJSON_Delete(root);
+    return 0;
+}
+
+/* ---------------------------------------------------------
+ * doctor: environment diagnostics
+ * --------------------------------------------------------- */
+
+static int command_exists_simple(const char *name)
+{
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "command -v %s >/dev/null 2>&1", name);
+    return system(cmd) == 0;
+}
+
+int doctor(void)
+{
+    printf("devpack doctor\n\n");
+
+    /* -------- OS + Arch -------- */
+    struct utsname u;
+    if (uname(&u) == 0) {
+        printf("OS          : %s\n", u.sysname);
+        printf("Kernel      : %s\n", u.release);
+        printf("Arch        : %s\n", u.machine);
+    } else {
+        printf("OS          : unknown\n");
+    }
+
+#if defined(_WIN32)
+    printf("Platform    : Windows\n");
+#else
+    /* -------- Distro -------- */
+    FILE *fp = fopen("/etc/os-release", "r");
+    char distro[128] = "unknown";
+
+    if (fp) {
+        char line[256];
+        while (fgets(line, sizeof(line), fp)) {
+            if (strncmp(line, "PRETTY_NAME=", 12) == 0) {
+                char *val = strchr(line, '=');
+                if (val) {
+                    val++;
+                    if (*val == '\"') val++;
+                    strncpy(distro, val, sizeof(distro) - 1);
+                    distro[strcspn(distro, "\"\n")] = 0;
+                }
+                break;
+            }
+        }
+        fclose(fp);
+    }
+
+    printf("Distro      : %s\n", distro);
+
+    /* -------- Package manager -------- */
+    const char *pm = "unknown";
+    if (command_exists_simple("pacman")) pm = "pacman";
+    else if (command_exists_simple("apt")) pm = "apt";
+    else if (command_exists_simple("dnf")) pm = "dnf";
+    else if (command_exists_simple("yum")) pm = "yum";
+    else if (command_exists_simple("zypper")) pm = "zypper";
+    else if (command_exists_simple("brew")) pm = "brew";
+
+    printf("Package mgr : %s\n", pm);
+
+    /* -------- Shell -------- */
+    const char *shell = getenv("SHELL");
+    printf("Shell       : %s\n", shell ? shell : "unknown");
+
+    /* -------- User / sudo -------- */
+    if (geteuid() == 0) {
+        printf("User        : root\n");
+    } else {
+        int has_sudo = command_exists_simple("sudo");
+        printf("User        : regular (%s)\n",
+               has_sudo ? "sudo available" : "no sudo");
+    }
+#endif
+
     return 0;
 }

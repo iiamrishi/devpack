@@ -17,6 +17,8 @@ static void print_usage(const char *prog) {
     printf("  %s stacks [--json]\n", prog);
     printf("  %s install <stack-id> [--dry-run]\n", prog);
     printf("  %s verify <stack-id>\n", prog);
+    printf("  %s doctor\n", prog);
+
 }
 
 int main(int argc, char **argv) {
@@ -73,6 +75,10 @@ int main(int argc, char **argv) {
         free_stack(&stack);
         return rc;
     }
+/* -------- doctor -------- */
+if (strcmp(cmd, "doctor") == 0) {
+    return doctor();
+}
 
     /* -------- verify -------- */
     if (strcmp(cmd, "verify") == 0) {

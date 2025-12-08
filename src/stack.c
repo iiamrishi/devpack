@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 /* ---------------------------------------------------------
  * Helpers
@@ -39,6 +40,116 @@ static int run_install_command(const char *label,
     return 0;
 }
 
+/* -------- Package manager detection (Linux) -------- */
+
+#if !defined(_WIN32)
+
+static int command_exists(const char *name)
+{
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd), "command -v %s 2>/dev/null", name);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        return 0;
+    }
+
+    char buf[64];
+    int ok = (fgets(buf, sizeof(buf), fp) != NULL);
+    pclose(fp);
+    return ok;
+}
+
+static const char *detect_package_manager(void)
+{
+    static const char *pm = NULL;
+    static int inited = 0;
+
+    if (inited) return pm;
+    inited = 1;
+
+    if (command_exists("pacman")) pm = "pacman";
+    else if (command_exists("apt")) pm = "apt";
+    else if (command_exists("dnf")) pm = "dnf";
+    else if (command_exists("yum")) pm = "yum";
+    else if (command_exists("zypper")) pm = "zypper";
+    else if (command_exists("brew")) pm = "brew";
+    else pm = NULL;
+
+    return pm;
+}
+
+/* linux_cmd format (optional advanced mode):
+ *
+ *   "pacman: sudo pacman -S foo | apt: sudo apt install foo | dnf: sudo dnf install foo"
+ *
+ * If no "pm:" prefixes are found, the string is used as-is.
+ */
+static const char *resolve_linux_cmd(const char *raw_cmd)
+{
+    static char buffer[1024];
+
+    if (!raw_cmd || !*raw_cmd) {
+        return raw_cmd;
+    }
+
+    const char *pm = detect_package_manager();
+    if (!pm) {
+        /* No known package manager detected, just use the raw string */
+        return raw_cmd;
+    }
+
+    size_t pm_len = strlen(pm);
+    const char *p = raw_cmd;
+
+    while (*p) {
+        /* skip leading separators and whitespace */
+        while (*p == ' ' || *p == '\t' || *p == '|')
+            p++;
+
+        if (!*p) break;
+
+        /* find prefix end: "tag: ..." */
+        const char *colon = strchr(p, ':');
+        if (!colon) {
+            /* no "tag:" -> this is not a multi-variant string; fallback */
+            return raw_cmd;
+        }
+
+        size_t tag_len = (size_t)(colon - p);
+
+        /* compare tag with pm name */
+        if (tag_len == pm_len && strncmp(p, pm, pm_len) == 0) {
+            /* matched, extract command after "tag:" until '|' or end */
+            const char *cmd_start = colon + 1;
+            while (*cmd_start == ' ' || *cmd_start == '\t')
+                cmd_start++;
+
+            const char *cmd_end = strchr(cmd_start, '|');
+            size_t copy_len = cmd_end ? (size_t)(cmd_end - cmd_start)
+                                      : strlen(cmd_start);
+
+            if (copy_len >= sizeof(buffer))
+                copy_len = sizeof(buffer) - 1;
+
+            memcpy(buffer, cmd_start, copy_len);
+            buffer[copy_len] = '\0';
+            return buffer;
+        } else {
+            /* skip to next '|' */
+            const char *next_sep = strchr(colon + 1, '|');
+            if (!next_sep)
+                break;
+            p = next_sep + 1;
+        }
+    }
+
+    /* No matching tag found -> fallback to raw string */
+    return raw_cmd;
+}
+
+#endif /* !defined(_WIN32) */
+
 /* To avoid infinite recursion, put a simple depth limit. */
 #define MAX_STACK_DEPTH 16
 
@@ -71,7 +182,8 @@ static int install_stack_internal(const Stack *stack, int dry_run, int depth)
     }
 
     if (depth > MAX_STACK_DEPTH) {
-        fprintf(stderr, COLOR_RED "install_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
+        fprintf(stderr,
+                COLOR_RED "install_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
         return 1;
     }
 
@@ -141,7 +253,7 @@ static int install_stack_internal(const Stack *stack, int dry_run, int depth)
     #if defined(_WIN32)
         const char *install_cmd = p->windows_cmd;
     #else
-        const char *install_cmd = p->linux_cmd;
+        const char *install_cmd = resolve_linux_cmd(p->linux_cmd);
     #endif
 
         if (run_install_command("install", install_cmd, dry_run) != 0) {
@@ -178,7 +290,8 @@ static int verify_stack_internal(const Stack *stack, int depth)
     }
 
     if (depth > MAX_STACK_DEPTH) {
-        fprintf(stderr, COLOR_RED "verify_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
+        fprintf(stderr,
+                COLOR_RED "verify_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
         return 1;
     }
 
