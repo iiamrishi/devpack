@@ -10,6 +10,7 @@ static void print_usage(const char *prog) {
     printf("Usage:\n");
     printf("  %s list\n", prog);
     printf("  %s install <stack-id> [--dry-run]\n", prog);
+    printf("  %s verify <stack-id>\n", prog);
 }
 
 int main(int argc, char **argv) {
@@ -42,6 +43,26 @@ int main(int argc, char **argv) {
         }
 
         int rc = install_stack(&stack, dry_run);
+        free_stack(&stack);
+        return rc;
+    }
+
+    /* -------- verify -------- */
+    if (strcmp(cmd, "verify") == 0) {
+        if (argc < 3) {
+            print_usage(argv[0]);
+            return 1;
+        }
+
+        const char *stack_id = argv[2];
+
+        Stack stack;
+        if (load_stack_from_file(stack_id, &stack) != 0) {
+            fprintf(stderr, "Failed to load stack '%s'\n", stack_id);
+            return 1;
+        }
+
+        int rc = verify_stack(&stack);
         free_stack(&stack);
         return rc;
     }

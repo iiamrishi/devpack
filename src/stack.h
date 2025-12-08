@@ -25,4 +25,7 @@ int install_stack(const Stack *stack, int dry_run);
 /* Free all memory owned by a Stack (packages, strings, etc.). */
 void free_stack(Stack *stack);
 
+
+int verify_stack(const Stack *stack);
+
 #endif

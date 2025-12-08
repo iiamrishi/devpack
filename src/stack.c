@@ -82,3 +82,53 @@ void free_stack(Stack *stack) {
 
     memset(stack, 0, sizeof(*stack));
 }
+
+
+int verify_stack(const Stack *stack)
+{
+    if (!stack) {
+        fprintf(stderr, "verify_stack: stack is NULL\n");
+        return 1;
+    }
+
+    printf("Verifying stack: %s (%s)\n",
+           stack->name ? stack->name : "(no-name)",
+           stack->id   ? stack->id   : "(no-id)");
+    printf("Packages: %d\n\n", stack->package_count);
+
+    int failures = 0;
+
+    for (int i = 0; i < stack->package_count; ++i) {
+        const Package *p = &stack->packages[i];
+
+        const char *id   = p->id           ? p->id           : "(no-id)";
+        const char *name = p->display_name ? p->display_name : "(no-name)";
+
+        printf("- [%s] %s\n", id, name);
+
+        if (!p->verify_cmd || !*p->verify_cmd) {
+            printf("    (no verify_cmd, skipping)\n\n");
+            continue;
+        }
+
+        printf("    $ %s\n", p->verify_cmd);
+        int status = system(p->verify_cmd);
+        if (status == -1) {
+            printf("    -> failed to start command\n\n");
+            failures++;
+        } else if (status != 0) {
+            printf("    -> command exited with status %d (NOT OK)\n\n", status);
+            failures++;
+        } else {
+            printf("    -> OK\n\n");
+        }
+    }
+
+    if (failures > 0) {
+        printf("Verification finished with %d failed check(s).\n", failures);
+        return 1;
+    }
+
+    printf("All checks passed.\n");
+    return 0;
+}

@@ -16,12 +16,12 @@
       "linux_cmd": "python3 -m ensurepip --upgrade",
       "verify_cmd": "python3 -m pip --version"
     },
-    {
-      "id": "venv",
-      "display_name": "Virtual Environment Tools",
-      "windows_cmd": "python -m pip install --upgrade virtualenv",
-      "linux_cmd": "python3 -m pip install --upgrade virtualenv",
-      "verify_cmd": "python3 -m virtualenv --version"
-    }
+{
+  "id": "venv",
+  "display_name": "Virtual Environment Tools",
+  "windows_cmd": "python -m venv venv-test",
+  "linux_cmd": "python3 -m venv venv-test",
+  "verify_cmd": "python3 -m venv --help"
+}
   ]
 }
