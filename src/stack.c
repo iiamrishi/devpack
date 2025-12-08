@@ -1,103 +1,240 @@
 #include "stack.h"
+#include "stack_loader.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-int install_stack(const Stack *stack, int dry_run) {
-    if (!stack) {
-        return -1;
+/* ---------------------------------------------------------
+ * Helpers
+ * --------------------------------------------------------- */
+
+static int run_install_command(const char *label,
+                               const char *cmd,
+                               int dry_run)
+{
+    if (!cmd || !*cmd) {
+        printf("    " COLOR_YELLOW "(%s: no command for this platform, skipping)" COLOR_RESET "\n",
+               label);
+        return 0;
     }
 
-    if (stack->package_count <= 0 || !stack->packages) {
-        fprintf(stderr, "Stack '%s' has no packages to install\n",
-                stack->id ? stack->id : "(unknown)");
-        return -1;
+    if (dry_run) {
+        printf("    " COLOR_YELLOW "[DRY-RUN] %s: %s" COLOR_RESET "\n", label, cmd);
+        return 0;
     }
 
-    printf("Installing stack: %s\n", stack->name ? stack->name : "(unnamed)");
-    int overall_rc = 0;
-
-    for (int i = 0; i < stack->package_count; i++) {
-        const Package *p = &stack->packages[i];
-
-        const char *cmd = NULL;
-
-#if defined(_WIN32)
-        cmd = p->windows_cmd;
-#else
-        cmd = p->linux_cmd;
-#endif
-
-        if (!cmd || cmd[0] == '\0') {
-            printf("  [skip] %s (no command for this platform)\n",
-                   p->display_name ? p->display_name : "(unnamed package)");
-            continue;
-        }
-
-        printf("  Package: %s\n", p->display_name ? p->display_name : "(unnamed package)");
-
-        if (dry_run) {
-            printf("    [dry-run] %s\n", cmd);
-        } else {
-            printf("    [run] %s\n", cmd);
-            int rc = system(cmd);
-            if (rc != 0) {
-                fprintf(stderr, "    Command failed with code %d\n", rc);
-                if (overall_rc == 0) {
-                    overall_rc = rc;
-                }
-            } else if (p->verify_cmd && p->verify_cmd[0] != '\0') {
-                printf("    [verify] %s\n", p->verify_cmd);
-                int vrc = system(p->verify_cmd);
-                if (vrc != 0 && overall_rc == 0) {
-                    overall_rc = vrc;
-                }
-            }
-        }
+    printf("    $ %s\n", cmd);
+    int status = system(cmd);
+    if (status == -1) {
+        printf("    " COLOR_RED "-> failed to start command" COLOR_RESET "\n");
+        return 1;
+    }
+    if (status != 0) {
+        printf("    " COLOR_RED "-> command exited with status %d" COLOR_RESET "\n", status);
+        return 1;
     }
 
-    return overall_rc;
+    printf("    " COLOR_GREEN "-> OK" COLOR_RESET "\n");
+    return 0;
 }
 
-void free_stack(Stack *stack) {
-    if (!stack) {
-        return;
-    }
+/* To avoid infinite recursion, put a simple depth limit. */
+#define MAX_STACK_DEPTH 16
 
-    free(stack->id);
-    free(stack->name);
+static int install_stack_internal(const Stack *stack, int dry_run, int depth);
+static int verify_stack_internal(const Stack *stack, int depth);
 
-    if (stack->packages) {
-        for (int i = 0; i < stack->package_count; i++) {
-            Package *p = &stack->packages[i];
-            free(p->id);
-            free(p->display_name);
-            free(p->windows_cmd);
-            free(p->linux_cmd);
-            free(p->verify_cmd);
-        }
-        free(stack->packages);
-    }
+/* ---------------------------------------------------------
+ * Public API
+ * --------------------------------------------------------- */
 
-    memset(stack, 0, sizeof(*stack));
+int install_stack(const Stack *stack, int dry_run)
+{
+    return install_stack_internal(stack, dry_run, 0);
 }
-
 
 int verify_stack(const Stack *stack)
+{
+    return verify_stack_internal(stack, 0);
+}
+
+/* ---------------------------------------------------------
+ * Implementation: install with dependencies
+ * --------------------------------------------------------- */
+
+static int install_stack_internal(const Stack *stack, int dry_run, int depth)
+{
+    if (!stack) {
+        fprintf(stderr, "install_stack: stack is NULL\n");
+        return 1;
+    }
+
+    if (depth > MAX_STACK_DEPTH) {
+        fprintf(stderr, COLOR_RED "install_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
+        return 1;
+    }
+
+    printf(COLOR_YELLOW "Installing stack: %s (%s)" COLOR_RESET "\n",
+           stack->name ? stack->name : "(no-name)",
+           stack->id   ? stack->id   : "(no-id)");
+    printf("Packages: %d\n", stack->package_count);
+
+    int failures = 0;
+
+    /* ---- Dependencies first ---- */
+    if (stack->depends_count > 0 && stack->depends_on) {
+        printf(COLOR_YELLOW "Resolving dependencies (%d):" COLOR_RESET "\n",
+               stack->depends_count);
+
+        for (int i = 0; i < stack->depends_count; ++i) {
+            const char *dep_id = stack->depends_on[i];
+            if (!dep_id || !*dep_id) continue;
+
+            /* Prevent trivial self-dependency loops */
+            if (stack->id && strcmp(stack->id, dep_id) == 0) {
+                printf("  " COLOR_RED "Skipping self-dependency '%s'" COLOR_RESET "\n", dep_id);
+                failures++;
+                continue;
+            }
+
+            printf("  -> %s\n", dep_id);
+
+            Stack dep;
+            if (load_stack_from_file(dep_id, &dep) != 0) {
+                printf("    " COLOR_RED "Failed to load dependency '%s'" COLOR_RESET "\n", dep_id);
+                failures++;
+                continue;
+            }
+
+            int rc = install_stack_internal(&dep, dry_run, depth + 1);
+            free_stack(&dep);
+
+            if (rc != 0) {
+                printf("    " COLOR_RED "Dependency '%s' not installed correctly" COLOR_RESET "\n",
+                       dep_id);
+                failures++;
+            } else {
+                printf("    " COLOR_GREEN "Dependency '%s' OK" COLOR_RESET "\n", dep_id);
+            }
+        }
+
+        if (failures > 0) {
+            printf(COLOR_RED "Aborting installation of '%s' due to dependency failures."
+                   COLOR_RESET "\n",
+                   stack->id ? stack->id : "(stack)");
+            return 1;
+        }
+
+        printf("\n");
+    }
+
+    /* ---- Now install this stack's packages ---- */
+    for (int i = 0; i < stack->package_count; ++i) {
+        const Package *p = &stack->packages[i];
+
+        const char *id   = p->id           ? p->id           : "(no-id)";
+        const char *name = p->display_name ? p->display_name : "(no-name)";
+
+        printf("- [%s] %s\n", id, name);
+
+    #if defined(_WIN32)
+        const char *install_cmd = p->windows_cmd;
+    #else
+        const char *install_cmd = p->linux_cmd;
+    #endif
+
+        if (run_install_command("install", install_cmd, dry_run) != 0) {
+            failures++;
+        }
+
+        if (p->verify_cmd && *p->verify_cmd) {
+            if (run_install_command("verify", p->verify_cmd, dry_run) != 0) {
+                failures++;
+            }
+        }
+
+        printf("\n");
+    }
+
+    if (failures > 0) {
+        printf(COLOR_RED "Finished with %d failed step(s)." COLOR_RESET "\n", failures);
+        return 1;
+    }
+
+    printf(COLOR_GREEN "All steps completed successfully." COLOR_RESET "\n");
+    return 0;
+}
+
+/* ---------------------------------------------------------
+ * Implementation: verify with dependencies
+ * --------------------------------------------------------- */
+
+static int verify_stack_internal(const Stack *stack, int depth)
 {
     if (!stack) {
         fprintf(stderr, "verify_stack: stack is NULL\n");
         return 1;
     }
 
-    printf("Verifying stack: %s (%s)\n",
+    if (depth > MAX_STACK_DEPTH) {
+        fprintf(stderr, COLOR_RED "verify_stack: maximum dependency depth exceeded" COLOR_RESET "\n");
+        return 1;
+    }
+
+    printf(COLOR_YELLOW "Verifying stack: %s (%s)" COLOR_RESET "\n",
            stack->name ? stack->name : "(no-name)",
            stack->id   ? stack->id   : "(no-id)");
     printf("Packages: %d\n\n", stack->package_count);
 
     int failures = 0;
 
+    /* ---- Dependencies first ---- */
+    if (stack->depends_count > 0 && stack->depends_on) {
+        printf(COLOR_YELLOW "Verifying dependencies (%d):" COLOR_RESET "\n",
+               stack->depends_count);
+
+        for (int i = 0; i < stack->depends_count; ++i) {
+            const char *dep_id = stack->depends_on[i];
+            if (!dep_id || !*dep_id) continue;
+
+            if (stack->id && strcmp(stack->id, dep_id) == 0) {
+                printf("  " COLOR_RED "Skipping self-dependency '%s'" COLOR_RESET "\n", dep_id);
+                failures++;
+                continue;
+            }
+
+            printf("  -> %s\n", dep_id);
+
+            Stack dep;
+            if (load_stack_from_file(dep_id, &dep) != 0) {
+                printf("    " COLOR_RED "Failed to load dependency '%s'" COLOR_RESET "\n", dep_id);
+                failures++;
+                continue;
+            }
+
+            int rc = verify_stack_internal(&dep, depth + 1);
+            free_stack(&dep);
+
+            if (rc != 0) {
+                printf("    " COLOR_RED "Dependency '%s' NOT OK" COLOR_RESET "\n", dep_id);
+                failures++;
+            } else {
+                printf("    " COLOR_GREEN "Dependency '%s' OK" COLOR_RESET "\n", dep_id);
+            }
+        }
+
+        if (failures > 0) {
+            printf(COLOR_RED
+                   "Verification aborted: one or more dependencies are not satisfied."
+                   COLOR_RESET "\n\n");
+            return 1;
+        }
+
+        printf("\n");
+    }
+
+    /* ---- Now verify this stack's own packages ---- */
     for (int i = 0; i < stack->package_count; ++i) {
         const Package *p = &stack->packages[i];
 
@@ -107,7 +244,7 @@ int verify_stack(const Stack *stack)
         printf("- [%s] %s\n", id, name);
 
         if (!p->verify_cmd || !*p->verify_cmd) {
-            printf("    (no verify_cmd, skipping)\n\n");
+            printf("    " COLOR_YELLOW "(no verify_cmd, skipping)" COLOR_RESET "\n\n");
             continue;
         }
 
@@ -123,16 +260,47 @@ int verify_stack(const Stack *stack)
         } else {
             printf("    " COLOR_GREEN "-> OK" COLOR_RESET "\n\n");
         }
-
     }
 
     if (failures > 0) {
-        printf(COLOR_RED "Verification finished with %d failed check(s).\n" COLOR_RESET,
+        printf(COLOR_RED "Verification finished with %d failed check(s)." COLOR_RESET "\n",
                failures);
         return 1;
     }
 
-    printf(COLOR_GREEN "All checks passed.\n" COLOR_RESET);
+    printf(COLOR_GREEN "All checks passed." COLOR_RESET "\n");
     return 0;
+}
 
+/* ---------------------------------------------------------
+ * Free stack
+ * --------------------------------------------------------- */
+
+void free_stack(Stack *s)
+{
+    if (!s) return;
+
+    free(s->id);
+    free(s->name);
+
+    if (s->packages) {
+        for (int i = 0; i < s->package_count; ++i) {
+            Package *p = &s->packages[i];
+            free(p->id);
+            free(p->display_name);
+            free(p->windows_cmd);
+            free(p->linux_cmd);
+            free(p->verify_cmd);
+        }
+        free(s->packages);
+    }
+
+    if (s->depends_on) {
+        for (int i = 0; i < s->depends_count; ++i) {
+            free(s->depends_on[i]);
+        }
+        free(s->depends_on);
+    }
+
+    memset(s, 0, sizeof(*s));
 }

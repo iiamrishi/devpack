@@ -1,5 +1,8 @@
 #ifndef STACK_H
 #define STACK_H
+
+#include <stddef.h>
+
 /* ANSI colors for pretty output */
 #define COLOR_RESET  "\x1b[0m"
 #define COLOR_RED    "\x1b[31m"
@@ -15,22 +18,29 @@ typedef struct {
 } Package;
 
 typedef struct {
-    char *id;
-    char *name;
-    int package_count;
+    char   *id;
+    char   *name;
+
     Package *packages;
+    int      package_count;
+
+    /* Optional stack dependencies (by stack-id) */
+    char  **depends_on;
+    int      depends_count;
 } Stack;
 
-/**
- * Install all packages in a stack.
- * If dry_run != 0, commands are only printed, not executed.
+/* Install all packages in the stack (and dependencies).
+ * dry_run != 0 → print commands but don't execute them.
+ * Returns 0 on success, non-zero on any failure.
  */
 int install_stack(const Stack *stack, int dry_run);
 
-/* Free all memory owned by a Stack (packages, strings, etc.). */
-void free_stack(Stack *stack);
-
-
+/* Verify stack (and dependencies) using verify_cmds.
+ * Returns 0 on success, non-zero on any failure.
+ */
 int verify_stack(const Stack *stack);
 
-#endif
+/* Free all heap allocations inside the stack. */
+void free_stack(Stack *stack);
+
+#endif /* STACK_H */

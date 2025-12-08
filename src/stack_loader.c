@@ -134,6 +134,25 @@ int load_stack_from_file(const char *stack_id, Stack *out)
         if (cJSON_IsString(ver))  p->verify_cmd   = xstrdup(ver->valuestring);
     }
 
+    /* Optional: depends_on array of stack IDs */
+    cJSON *deps = cJSON_GetObjectItemCaseSensitive(root, "depends_on");
+    if (cJSON_IsArray(deps)) {
+        int dep_count = cJSON_GetArraySize(deps);
+        if (dep_count > 0) {
+            out->depends_on = calloc((size_t)dep_count, sizeof(char *));
+            if (out->depends_on) {
+                int dep_idx = 0;
+                cJSON *dep = NULL;
+                cJSON_ArrayForEach(dep, deps) {
+                    if (cJSON_IsString(dep)) {
+                        out->depends_on[dep_idx++] = xstrdup(dep->valuestring);
+                    }
+                }
+                out->depends_count = dep_idx; /* in case some entries were invalid */
+            }
+        }
+    }
+
     cJSON_Delete(root);
     return 0;
 }
@@ -246,6 +265,22 @@ int list_available_stacks_json(void)
                 cJSON_AddStringToObject(item, "file", name);
                 cJSON_AddNumberToObject(item, "package_count",
                                         s.package_count);
+
+                /* Include depends_on if present */
+                if (s.depends_count > 0 && s.depends_on) {
+                    cJSON *deps_arr = cJSON_CreateArray();
+                    if (deps_arr) {
+                        for (int d = 0; d < s.depends_count; ++d) {
+                            if (s.depends_on[d]) {
+                                cJSON_AddItemToArray(
+                                    deps_arr,
+                                    cJSON_CreateString(s.depends_on[d]));
+                            }
+                        }
+                        cJSON_AddItemToObject(item, "depends_on", deps_arr);
+                    }
+                }
+
                 cJSON_AddItemToArray(arr, item);
             }
             free_stack(&s);

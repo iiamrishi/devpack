@@ -1,0 +1,21 @@
+{
+  "id": "web-dev",
+  "name": "Web Development Stack",
+  "depends_on": ["python-dev"],
+  "packages": [
+    {
+      "id": "node",
+      "display_name": "Node.js + npm",
+      "windows_cmd": "winget install -e --id OpenJS.NodeJS",
+      "linux_cmd": "sudo pacman -S --needed nodejs npm",
+      "verify_cmd": "node --version && npm --version"
+    },
+    {
+      "id": "git",
+      "display_name": "Git",
+      "windows_cmd": "winget install -e --id Git.Git",
+      "linux_cmd": "sudo pacman -S --needed git",
+      "verify_cmd": "git --version"
+    }
+  ]
+}

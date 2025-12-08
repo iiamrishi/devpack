@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "cJSON.h"
+
 /* ---------------------------------------------------------
  * Helper: run a shell command and capture first line output
  * --------------------------------------------------------- */
@@ -211,7 +213,7 @@ static DevStack STACKS[] = {
 };
 
 /* ---------------------------------------------------------
- * Public API
+ * Public API: human-readable list
  * --------------------------------------------------------- */
 int list_stacks(void)
 {
@@ -248,13 +250,93 @@ int list_stacks(void)
 
     printf("\n");
 
-    bool web_ok      = has_git && has_node;
-    const char *web_color = web_ok ? COLOR_GREEN : COLOR_RED;
-    const char *web_tag   = web_ok ? "OK" : "MISSING";
+    bool web_ok         = has_git && has_node;
+    const char *web_c   = web_ok ? COLOR_GREEN : COLOR_RED;
+    const char *web_tag = web_ok ? "OK" : "MISSING";
 
-    printf("[%s%s%s] Web Dev\n", web_color, web_tag, COLOR_RESET);
+    printf("[%s%s%s] Web Dev\n", web_c, web_tag, COLOR_RESET);
     printf("    -> needs Git + Node.js%s\n",
            has_docker ? " (Docker available)" : " (Docker optional)");
 
+    return 0;
+}
+
+/* ---------------------------------------------------------
+ * Public API: JSON list
+ * --------------------------------------------------------- */
+int list_stacks_json(void)
+{
+    char details[256];
+    size_t count = sizeof(STACKS) / sizeof(STACKS[0]);
+
+    bool has_git    = false;
+    bool has_node   = false;
+    bool has_docker = false;
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return 1;
+
+    cJSON *arr = cJSON_CreateArray();
+    if (!arr) {
+        cJSON_Delete(root);
+        return 1;
+    }
+    cJSON_AddItemToObject(root, "stacks", arr);
+
+    for (size_t i = 0; i < count; i++) {
+        memset(details, 0, sizeof(details));
+
+        DevStack *s = &STACKS[i];
+        bool ok = s->detect_fn(details, sizeof(details));
+
+        if (strcmp(s->name, "Git") == 0 && ok) {
+            has_git = true;
+        } else if (strcmp(s->name, "Node.js") == 0 && ok) {
+            has_node = true;
+        } else if (strcmp(s->name, "Docker") == 0 && ok) {
+            has_docker = true;
+        }
+
+        cJSON *item = cJSON_CreateObject();
+        if (!item) continue;
+
+        cJSON_AddStringToObject(item, "name", s->name);
+        cJSON_AddStringToObject(item, "status", ok ? "OK" : "MISSING");
+        if (details[0] != '\0') {
+            cJSON_AddStringToObject(item, "details", details);
+        }
+
+        cJSON_AddItemToArray(arr, item);
+    }
+
+    /* Web Dev combined info */
+    cJSON *web = cJSON_CreateObject();
+    if (web) {
+        bool web_ok = has_git && has_node;
+        cJSON_AddStringToObject(web, "name", "Web Dev");
+        cJSON_AddStringToObject(web, "status", web_ok ? "OK" : "MISSING");
+
+        cJSON *req = cJSON_CreateArray();
+        if (req) {
+            cJSON_AddItemToArray(req, cJSON_CreateString("Git"));
+            cJSON_AddItemToArray(req, cJSON_CreateString("Node.js"));
+            cJSON_AddItemToObject(web, "requires", req);
+        }
+
+        cJSON_AddStringToObject(web, "docker",
+                                has_docker ? "available" : "optional-or-missing");
+
+        cJSON_AddItemToObject(root, "web_dev", web);
+    }
+
+    char *json = cJSON_Print(root);
+    if (!json) {
+        cJSON_Delete(root);
+        return 1;
+    }
+
+    printf("%s\n", json);
+    free(json);
+    cJSON_Delete(root);
     return 0;
 }
