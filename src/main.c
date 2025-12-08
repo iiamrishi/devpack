@@ -9,6 +9,7 @@ static void print_usage(const char *prog) {
     printf("devpack – simple dev environment installer\n\n");
     printf("Usage:\n");
     printf("  %s list\n", prog);
+    printf("  %s stacks\n", prog);
     printf("  %s install <stack-id> [--dry-run]\n", prog);
     printf("  %s verify <stack-id>\n", prog);
 }
@@ -21,9 +22,14 @@ int main(int argc, char **argv) {
 
     const char *cmd = argv[1];
 
-    /* -------- list -------- */
+    /* -------- list: detect system stacks -------- */
     if (strcmp(cmd, "list") == 0) {
         return list_stacks();
+    }
+
+    /* -------- stacks: list JSON-defined stacks -------- */
+    if (strcmp(cmd, "stacks") == 0) {
+        return list_available_stacks();
     }
 
     /* -------- install -------- */

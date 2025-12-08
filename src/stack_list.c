@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#define _POSIX_C_SOURCE 200809L
+
 
 /* ---------------------------------------------------------
  * Helper: run a shell command and capture first line output
