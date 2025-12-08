@@ -5,9 +5,14 @@
 #include "stack_loader.h"
 #include "stack_list.h"
 
+#ifndef DEVPACK_VERSION
+#define DEVPACK_VERSION "dev"
+#endif
+
 static void print_usage(const char *prog) {
     printf("devpack – simple dev environment installer\n\n");
     printf("Usage:\n");
+    printf("  %s --version\n", prog);
     printf("  %s list [--json]\n", prog);
     printf("  %s stacks [--json]\n", prog);
     printf("  %s install <stack-id> [--dry-run]\n", prog);
@@ -22,7 +27,13 @@ int main(int argc, char **argv) {
 
     const char *cmd = argv[1];
 
-     /* -------- list: detect system stacks -------- */
+    /* -------- version -------- */
+    if (strcmp(cmd, "--version") == 0 || strcmp(cmd, "version") == 0) {
+        printf("devpack %s\n", DEVPACK_VERSION);
+        return 0;
+    }
+
+    /* -------- list: detect system stacks -------- */
     if (strcmp(cmd, "list") == 0) {
         int json = (argc >= 3 && strcmp(argv[2], "--json") == 0);
         if (json) {
@@ -31,6 +42,7 @@ int main(int argc, char **argv) {
             return list_stacks();
         }
     }
+
     /* -------- stacks: list JSON-defined stacks -------- */
     if (strcmp(cmd, "stacks") == 0) {
         int json = (argc >= 3 && strcmp(argv[2], "--json") == 0);
